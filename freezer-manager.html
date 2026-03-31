@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>冷凍庫管理系統</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --surface3: #30363d;
+  --border: #30363d; --border2: #484f58; --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+  --accent: #58a6ff; --accent2: #1f6feb; --green: #3fb950; --orange: #d29922; --red: #f85149;
+  --samsung: #1428a0; --panasonic: #004b87; --chest: #2d6a4f;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Noto Sans TC',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; font-size:14px; }
+
+/* SETUP */
+#setup-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+.setup-card { background:var(--surface); border:1px solid var(--border2); border-radius:16px; padding:32px; max-width:500px; width:100%; }
+.setup-logo { font-family:'DM Mono',monospace; font-size:20px; color:var(--accent); margin-bottom:6px; }
+.setup-sub { color:var(--text3); font-size:12px; margin-bottom:24px; line-height:1.7; }
+.setup-step { margin-bottom:16px; }
+.setup-step-label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1.5px; font-family:'DM Mono',monospace; margin-bottom:6px; }
+.setup-input { width:100%; background:var(--surface2); border:1px solid var(--border2); border-radius:8px; padding:10px 14px; color:var(--text); font-family:'DM Mono',monospace; font-size:12px; outline:none; transition:border-color .15s; }
+.setup-input:focus { border-color:var(--accent); }
+.setup-hint { font-size:11px; color:var(--text3); margin-top:5px; line-height:1.6; }
+.setup-btn { width:100%; padding:12px; background:var(--accent2); color:white; border:1px solid var(--accent); border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; transition:background .15s; margin-top:4px; }
+.setup-btn:hover { background:var(--accent); }
+.setup-error { color:var(--red); font-size:12px; margin-top:10px; display:none; }
+.setup-link { color:var(--accent); text-decoration:none; }
+.setup-link:hover { text-decoration:underline; }
+.how-to { background:var(--surface2); border-radius:10px; padding:16px; margin-bottom:20px; }
+.how-to-title { font-size:12px; font-weight:700; margin-bottom:10px; color:var(--text2); }
+.how-to ol { padding-left:18px; }
+.how-to li { font-size:12px; color:var(--text3); line-height:2; }
+.how-to b { color:var(--text2); }
+
+/* CONNECTING */
+#connecting-screen { display:none; align-items:center; justify-content:center; min-height:100vh; flex-direction:column; gap:16px; }
+.spinner { width:36px; height:36px; border:3px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* APP */
+#app-screen { display:none; }
+.header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:56px; position:sticky; top:0; z-index:100; gap:12px; flex-wrap:wrap; }
+.logo { font-family:'DM Mono',monospace; font-size:14px; color:var(--accent); letter-spacing:2px; white-space:nowrap; }
+.header-right { display:flex; align-items:center; gap:8px; }
+.sync-dot { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
+.sync-dot.off { background:var(--text3); }
+.sync-label { font-size:11px; color:var(--text3); font-family:'DM Mono',monospace; }
+.logout-btn { background:none; border:1px solid var(--border2); color:var(--text2); border-radius:5px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:inherit; transition:all .15s; }
+.logout-btn:hover { border-color:var(--red); color:var(--red); }
+.nav-tabs { display:flex; gap:4px; }
+.nav-tab { padding:6px 12px; border-radius:6px; cursor:pointer; color:var(--text2); font-size:13px; border:none; background:none; transition:all .15s; font-family:inherit; }
+.nav-tab:hover { background:var(--surface2); color:var(--text); }
+.nav-tab.active { background:var(--surface2); color:var(--accent); border:1px solid var(--border2); }
+.main { padding:20px; max-width:1100px; margin:0 auto; }
+.page { display:none; }
+.page.active { display:block; }
+
+/* STATS */
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.stat-val { font-size:24px; font-weight:700; font-family:'DM Mono',monospace; color:var(--accent); }
+.stat-lbl { font-size:11px; color:var(--text3); margin-top:2px; }
+
+/* OVERVIEW GRID */
+.overview-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.freezer-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s; }
+.freezer-card:hover { border-color:var(--border2); }
+.freezer-header { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+.freezer-name { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; }
+.freezer-badge { font-family:'DM Mono',monospace; font-size:11px; padding:2px 7px; border-radius:4px; font-weight:500; color:white; }
+.badge-samsung { background:var(--samsung); }
+.badge-panasonic { background:var(--panasonic); }
+.badge-chest { background:var(--chest); }
+.freezer-count { font-size:11px; color:var(--text3); font-family:'DM Mono',monospace; }
+.compartment { padding:10px 14px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; }
+.compartment:last-child { border-bottom:none; }
+.compartment:hover { background:var(--surface2); }
+.compartment-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.compartment-name { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:'DM Mono',monospace; }
+.add-btn { width:20px; height:20px; border-radius:4px; background:var(--surface3); border:1px solid var(--border2); color:var(--text2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; transition:all .15s; flex-shrink:0; }
+.add-btn:hover { background:var(--accent2); border-color:var(--accent); color:white; }
+.items-list { display:flex; flex-wrap:wrap; gap:4px; min-height:20px; }
+.item-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:20px; background:var(--surface3); border:1px solid var(--border2); font-size:12px; cursor:pointer; transition:all .15s; }
+.item-chip:hover { border-color:var(--accent); background:rgba(88,166,255,.1); }
+.item-chip.old { border-color:var(--orange); background:rgba(210,153,34,.1); }
+.item-chip.very-old { border-color:var(--red); background:rgba(248,81,73,.1); }
+.item-qty { font-family:'DM Mono',monospace; font-size:11px; color:var(--text2); }
+.empty-hint { font-size:11px; color:var(--text3); font-style:italic; padding:2px 0; }
+
+/* SEARCH */
+.search-bar { width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:8px; padding:10px 14px; color:var(--text); font-family:inherit; font-size:14px; outline:none; margin-bottom:16px; transition:border-color .15s; }
+.search-bar:focus { border-color:var(--accent); }
+.search-result-item { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.result-name { font-weight:500; }
+.result-loc { font-size:12px; color:var(--text2); margin-top:2px; }
+.result-qty { font-family:'DM Mono',monospace; font-size:13px; color:var(--green); }
+.no-result { color:var(--text3); font-size:13px; text-align:center; padding:32px; }
+
+/* ALERTS */
+.alert-section { margin-bottom:20px; }
+.section-title { font-size:12px; color:var(--text3); text-transform:uppercase; letter-spacing:1.5px; font-family:'DM Mono',monospace; margin-bottom:10px; }
+.alert-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.alert-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.alert-dot.orange { background:var(--orange); }
+.alert-dot.red { background:var(--red); }
+.alert-info { flex:1; }
+.alert-name { font-size:13px; font-weight:500; }
+.alert-meta { font-size:11px; color:var(--text3); margin-top:1px; }
+.alert-days { font-family:'DM Mono',monospace; font-size:12px; color:var(--text2); }
+
+/* REPORT */
+.report-controls { display:flex; gap:10px; margin-bottom:20px; }
+.report-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:16px; overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th { padding:10px 14px; text-align:left; font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:'DM Mono',monospace; background:var(--surface2); border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:var(--surface2); }
+
+/* MODAL */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border2); border-radius:12px; width:100%; max-width:440px; overflow:hidden; animation:modalIn .2s ease; }
+@keyframes modalIn { from { opacity:0; transform:scale(.95) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+.modal-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.modal-title { font-weight:700; font-size:15px; }
+.modal-close { background:none; border:none; color:var(--text2); cursor:pointer; font-size:18px; padding:2px 6px; border-radius:4px; }
+.modal-close:hover { background:var(--surface3); color:var(--text); }
+.modal-body { padding:20px; display:flex; flex-direction:column; gap:14px; max-height:70vh; overflow-y:auto; }
+.modal-loc-info { background:var(--surface2); border-radius:6px; padding:8px 12px; font-size:12px; color:var(--text2); }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-label { font-size:12px; color:var(--text3); }
+.form-input { background:var(--surface2); border:1px solid var(--border2); border-radius:6px; padding:9px 12px; color:var(--text); font-family:inherit; font-size:14px; outline:none; transition:border-color .15s; width:100%; }
+.form-input:focus { border-color:var(--accent); }
+.autocomplete-list { display:flex; flex-wrap:wrap; gap:4px; }
+.autocomplete-chip { padding:3px 10px; border-radius:20px; background:var(--surface3); border:1px solid var(--border2); font-size:12px; cursor:pointer; transition:all .15s; color:var(--text2); }
+.autocomplete-chip:hover { border-color:var(--accent); color:var(--text); background:rgba(88,166,255,.1); }
+.modal-footer { padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+.btn { padding:8px 16px; border-radius:6px; border:none; font-family:inherit; font-size:13px; cursor:pointer; font-weight:500; transition:all .15s; }
+.btn-primary { background:var(--accent2); color:white; border:1px solid var(--accent); }
+.btn-primary:hover { background:var(--accent); }
+.btn-secondary { background:var(--surface3); color:var(--text); border:1px solid var(--border2); }
+.btn-secondary:hover { background:var(--border2); }
+.item-detail-rows { display:flex; flex-direction:column; gap:8px; }
+.item-detail-row { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--surface2); border-radius:6px; gap:8px; }
+.item-detail-left { flex:1; min-width:0; }
+.item-detail-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.item-detail-meta { font-size:11px; color:var(--text3); margin-top:2px; }
+.item-actions { display:flex; gap:5px; align-items:center; flex-shrink:0; }
+.qty-unit-input { width:72px; font-size:12px; padding:5px 8px; background:var(--surface3); border:1px solid var(--border2); border-radius:5px; color:var(--text); font-family:inherit; outline:none; }
+.qty-btn { width:28px; height:28px; border-radius:6px; border:1px solid var(--border2); background:var(--surface3); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; transition:all .15s; flex-shrink:0; }
+
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--surface3); border:1px solid var(--border2); border-radius:8px; padding:10px 20px; font-size:13px; opacity:0; transition:all .25s; z-index:999; white-space:nowrap; pointer-events:none; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+@media (max-width:768px) {
+  .overview-grid { grid-template-columns:1fr; }
+  .stats-row { grid-template-columns:1fr 1fr; }
+  .nav-tab .lbl { display:none; }
+  .header { height:auto; padding:10px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">🧊 冷凍庫管理系統</div>
+    <div class="setup-sub">首次使用請填入 Firebase 設定，資料就會存在雲端，所有裝置都能即時同步。</div>
+
+    <div class="how-to">
+      <div class="how-to-title">📋 如何取得 Firebase 設定（約 5 分鐘）</div>
+      <ol>
+        <li>前往 <a class="setup-link" href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a>，用 Google 帳號登入</li>
+        <li>點「<b>新增專案</b>」→ 輸入名稱（例：freezer）→ 關掉 Google Analytics → 建立專案</li>
+        <li>進入專案後，左側選單點「<b>Firestore Database</b>」→「<b>建立資料庫</b>」→ 選「<b>測試模式</b>」→ 地區選 <b>asia-east1</b></li>
+        <li>回到專案首頁，點頁面中間的「<b>&lt;/&gt;</b>」圖示 → 輸入應用程式名稱 → 點「<b>繼續</b>」</li>
+        <li>畫面會出現 <b>firebaseConfig</b> 的程式碼，把裡面的值一一複製貼到下方欄位</li>
+      </ol>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-label">apiKey</div>
+      <input class="setup-input" id="cfg-apiKey" placeholder="AIzaSy...">
+    </div>
+    <div class="setup-step">
+      <div class="setup-step-label">authDomain</div>
+      <input class="setup-input" id="cfg-authDomain" placeholder="your-project.firebaseapp.com">
+    </div>
+    <div class="setup-step">
+      <div class="setup-step-label">projectId</div>
+      <input class="setup-input" id="cfg-projectId" placeholder="your-project-id">
+    </div>
+    <div class="setup-step">
+      <div class="setup-step-label">appId</div>
+      <input class="setup-input" id="cfg-appId" placeholder="1:1234567890:web:abc123def456">
+    </div>
+
+    <button class="setup-btn" onclick="connectFirebase()">🔗 連線並開始使用</button>
+    <div class="setup-error" id="setup-error"></div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:center;">
+      <span style="font-size:11px;color:var(--text3);">已在這台裝置設定過？ </span>
+      <button onclick="loadSavedConfig()" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;font-family:inherit;">直接讀取</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECTING -->
+<div id="connecting-screen">
+  <div class="spinner"></div>
+  <div style="color:var(--text3);font-size:13px;">正在連線到雲端資料庫…</div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <div class="header">
+    <div class="logo">🧊 FREEZER</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchPage(this,'overview')">🏠 <span class="lbl">總覽</span></button>
+      <button class="nav-tab" onclick="switchPage(this,'search')">🔍 <span class="lbl">搜尋</span></button>
+      <button class="nav-tab" onclick="switchPage(this,'alerts')">⚠️ <span class="lbl">提醒</span></button>
+      <button class="nav-tab" onclick="switchPage(this,'report')">📊 <span class="lbl">報表</span></button>
+    </div>
+    <div class="header-right">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span class="sync-label" id="sync-label">已同步</span>
+      <button class="logout-btn" onclick="resetConfig()">重設</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page active" id="page-overview">
+      <div class="stats-row" id="stats-row"></div>
+      <div class="overview-grid" id="overview-grid"></div>
+    </div>
+    <div class="page" id="page-search">
+      <input class="search-bar" id="search-input" placeholder="輸入食物名稱搜尋…" oninput="doSearch()">
+      <div id="search-results"></div>
+    </div>
+    <div class="page" id="page-alerts">
+      <div class="alert-section">
+        <div class="section-title">🔴 冷凍超過 6 個月</div>
+        <div id="cards-very-old"></div>
+      </div>
+      <div class="alert-section">
+        <div class="section-title">🟠 冷凍超過 3 個月</div>
+        <div id="cards-old"></div>
+      </div>
+      <div id="no-alert" style="display:none;text-align:center;padding:60px 20px;color:var(--text3);">✅ 目前沒有存放過久的食物，冷凍庫管理良好！</div>
+    </div>
+    <div class="page" id="page-report">
+      <div class="report-controls">
+        <button class="btn btn-primary" onclick="exportCSV()">📥 匯出 CSV（Excel 相容）</button>
+        <button class="btn btn-secondary" onclick="renderReport()">🔄 重新整理</button>
+      </div>
+      <div class="section-title">目前庫存清單</div>
+      <div class="report-table-wrap">
+        <table><thead><tr><th>食物名稱</th><th>位置</th><th>數量</th><th>存入日期</th><th>冷凍天數</th><th>狀態</th></tr></thead>
+        <tbody id="report-tbody"></tbody></table>
+      </div>
+      <div class="section-title" style="margin-top:20px;">歷史紀錄</div>
+      <div class="report-table-wrap">
+        <table><thead><tr><th>時間</th><th>動作</th><th>食物</th><th>位置</th><th>數量</th></tr></thead>
+        <tbody id="history-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">➕ 新增庫存</span>
+      <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-loc-info" id="add-loc-info"></div>
+      <div class="form-group">
+        <label class="form-label">食物名稱</label>
+        <input class="form-input" id="add-name" placeholder="輸入食物名稱…" oninput="updateAutocomplete()" autocomplete="off">
+        <div class="autocomplete-list" id="autocomplete-list"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">數量（如：2包、500g、1盒）</label>
+        <input class="form-input" id="add-qty" placeholder="例：2包">
+      </div>
+      <div class="form-group">
+        <label class="form-label">存入日期</label>
+        <input class="form-input" type="date" id="add-date">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add')">取消</button>
+      <button class="btn btn-primary" onclick="confirmAdd()">確認新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="edit-title">✏️ 管理庫存</span>
+      <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-loc-info" id="edit-loc-info"></div>
+      <div class="item-detail-rows" id="edit-rows"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit')">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const FREEZERS = {
+  A: { name:'A（Samsung）', badge:'Samsung', badgeClass:'badge-samsung',
+    compartments:[{id:'A-upper',name:'上層'},{id:'A-lower',name:'下層'},{id:'A-ice',name:'製冰盒位置（小）'}] },
+  B: { name:'B（Panasonic）', badge:'Panasonic', badgeClass:'badge-panasonic',
+    compartments:[{id:'B-big',name:'大抽屜'},{id:'B-small',name:'小抽屜'}] },
+  C: { name:'C（冷凍櫃）', badge:'冷凍櫃', badgeClass:'badge-chest',
+    compartments:[{id:'C-tray',name:'① 托盤'},{id:'C-flip',name:'② 掀門層'},{id:'C-d1',name:'③ 抽屜（海鮮）'},{id:'C-d2',name:'④ 抽屜（肉類）'},{id:'C-d3',name:'⑤ 抽屜（中藥材・乾貨）'}] }
+};
+
+let db = null;
+let items = {};
+let foodNames = [];
+let addTarget = null;
+let editTarget = null;
+
+const today = () => new Date().toISOString().slice(0,10);
+const daysSince = ds => Math.floor((Date.now() - new Date(ds)) / 86400000);
+const locLabel = (fid, cid) => {
+  const f = FREEZERS[fid]; const c = f?.compartments.find(c=>c.id===cid);
+  return `冰箱 ${f?.name||fid} → ${c?.name||cid}`;
+};
+const showToast = msg => {
+  const t = document.getElementById('toast'); t.textContent = msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2400);
+};
+const setSyncStatus = ok => {
+  document.getElementById('sync-dot').className = 'sync-dot'+(ok?'':' off');
+  document.getElementById('sync-label').textContent = ok?'已同步':'離線';
+};
+
+// ── CONNECT ──
+window.connectFirebase = async () => {
+  const get = id => document.getElementById(id).value.trim();
+  const apiKey=get('cfg-apiKey'), authDomain=get('cfg-authDomain'), projectId=get('cfg-projectId'), appId=get('cfg-appId');
+  const errEl = document.getElementById('setup-error'); errEl.style.display='none';
+  if (!apiKey||!authDomain||!projectId||!appId) { errEl.textContent='請填寫所有欄位'; errEl.style.display='block'; return; }
+  localStorage.setItem('fb_cfg', JSON.stringify({apiKey,authDomain,projectId,appId}));
+  await initApp({apiKey,authDomain,projectId,appId});
+};
+window.loadSavedConfig = async () => {
+  const raw = localStorage.getItem('fb_cfg');
+  if (!raw) { showToast('找不到已儲存的設定'); return; }
+  await initApp(JSON.parse(raw));
+};
+window.resetConfig = () => {
+  if (confirm('確定要清除 Firebase 設定嗎？')) { localStorage.removeItem('fb_cfg'); location.reload(); }
+};
+
+async function initApp(cfg) {
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('connecting-screen').style.display='flex';
+  try {
+    db = getFirestore(initializeApp(cfg));
+    try {
+      const snap = await getDocs(collection(db,'meta'));
+      snap.forEach(d => { if(d.id==='foodNames') foodNames = d.data().list||[]; });
+    } catch(e) {}
+    onSnapshot(collection(db,'items'), snap => {
+      items = {};
+      snap.forEach(d => { items[d.id]={id:d.id,...d.data()}; });
+      renderOverview(); setSyncStatus(true);
+    }, () => setSyncStatus(false));
+    document.getElementById('connecting-screen').style.display='none';
+    document.getElementById('app-screen').style.display='block';
+  } catch(e) {
+    document.getElementById('connecting-screen').style.display='none';
+    document.getElementById('setup-screen').style.display='flex';
+    const errEl=document.getElementById('setup-error');
+    errEl.textContent='連線失敗：'+e.message; errEl.style.display='block';
+  }
+}
+
+const saved = localStorage.getItem('fb_cfg');
+if (saved) initApp(JSON.parse(saved));
+
+// ── RENDER ──
+function renderOverview() {
+  const all = Object.values(items);
+  const old = all.filter(i=>daysSince(i.date)>=90);
+  const vold = all.filter(i=>daysSince(i.date)>=180);
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-val">${all.length}</div><div class="stat-lbl">總庫存品項</div></div>
+    <div class="stat-card"><div class="stat-val">${new Set(all.map(i=>i.name)).size}</div><div class="stat-lbl">食物種類</div></div>
+    <div class="stat-card" style="border-color:${old.length?'var(--orange)':'var(--border)'}">
+      <div class="stat-val" style="color:${old.length?'var(--orange)':'var(--accent)'}">${old.length}</div><div class="stat-lbl">冷凍 &gt;3 個月</div></div>
+    <div class="stat-card" style="border-color:${vold.length?'var(--red)':'var(--border)'}">
+      <div class="stat-val" style="color:${vold.length?'var(--red)':'var(--accent)'}">${vold.length}</div><div class="stat-lbl">冷凍 &gt;6 個月</div></div>`;
+
+  const grid = document.getElementById('overview-grid'); grid.innerHTML='';
+  Object.entries(FREEZERS).forEach(([fid,fz]) => {
+    const ci = {}; fz.compartments.forEach(c=>ci[c.id]=[]);
+    all.forEach(item => { if(item.freezerId===fid && ci[item.compId]) ci[item.compId].push(item); });
+    const total = fz.compartments.reduce((s,c)=>s+ci[c.id].length,0);
+    let html=`<div class="freezer-card"><div class="freezer-header">
+      <div class="freezer-name"><span>${fid==='C'?'🗄️':'🧊'}</span><span>冰箱 ${fid}</span>
+        <span class="freezer-badge ${fz.badgeClass}">${fz.badge}</span></div>
+      <span class="freezer-count">${total} 項</span></div>`;
+    fz.compartments.forEach(comp => {
+      const its = ci[comp.id];
+      const cname = comp.name.replace(/'/g,'\\x27');
+      html += `<div class="compartment" onclick="openEditModal('${fid}','${comp.id}')">
+        <div class="compartment-header">
+          <span class="compartment-name">${comp.name}</span>
+          <button class="add-btn" onclick="event.stopPropagation();openAddModal('${fid}','${comp.id}','${cname}')">+</button>
+        </div><div class="items-list">`;
+      if(!its.length) { html+=`<span class="empty-hint">（空）</span>`; }
+      else its.forEach(item => {
+        const d=daysSince(item.date); const cls=d>=180?'very-old':d>=90?'old':'';
+        html+=`<span class="item-chip ${cls}" onclick="event.stopPropagation();openEditModal('${fid}','${comp.id}')">${item.name} <span class="item-qty">${item.qty}</span></span>`;
+      });
+      html+=`</div></div>`;
+    });
+    grid.innerHTML += html+'</div>';
+  });
+}
+
+// ── ADD ──
+window.openAddModal = (fid, cid, cname) => {
+  addTarget={fid,cid,cname};
+  document.getElementById('add-loc-info').textContent=`位置：冰箱 ${FREEZERS[fid].name} → ${cname}`;
+  document.getElementById('add-name').value='';
+  document.getElementById('add-qty').value='';
+  document.getElementById('add-date').value=today();
+  document.getElementById('autocomplete-list').innerHTML='';
+  document.getElementById('modal-add').classList.add('open');
+  setTimeout(()=>document.getElementById('add-name').focus(),100);
+};
+window.updateAutocomplete = () => {
+  const val=document.getElementById('add-name').value.trim();
+  const list=document.getElementById('autocomplete-list');
+  if(!val){list.innerHTML='';return;}
+  const m=foodNames.filter(n=>n.includes(val)&&n!==val).slice(0,8);
+  list.innerHTML=m.map(n=>`<span class="autocomplete-chip" onclick="selectAC(this,'${n.replace(/'/g,'\\x27')}')">${n}</span>`).join('');
+};
+window.selectAC = (el, name) => {
+  document.getElementById('add-name').value=name;
+  document.getElementById('autocomplete-list').innerHTML='';
+  document.getElementById('add-qty').focus();
+};
+window.confirmAdd = async () => {
+  if(!db||!addTarget) return;
+  const name=document.getElementById('add-name').value.trim();
+  const qty=document.getElementById('add-qty').value.trim();
+  const date=document.getElementById('add-date').value;
+  if(!name){showToast('請輸入食物名稱');return;}
+  if(!qty){showToast('請輸入數量');return;}
+  try {
+    await addDoc(collection(db,'items'),{name,qty,date,freezerId:addTarget.fid,compId:addTarget.cid,createdAt:serverTimestamp()});
+    await addDoc(collection(db,'history'),{time:serverTimestamp(),action:'新增',name,qty,loc:locLabel(addTarget.fid,addTarget.cid)});
+    if(!foodNames.includes(name)){foodNames.push(name);await setDoc(doc(db,'meta','foodNames'),{list:foodNames});}
+    closeModal('modal-add'); showToast(`✅ 已新增：${name} ${qty}`);
+  } catch(e){showToast('❌ 新增失敗：'+e.message);}
+};
+
+// ── EDIT ──
+window.openEditModal = (fid, cid) => {
+  const fz=FREEZERS[fid]; const comp=fz.compartments.find(c=>c.id===cid);
+  editTarget={fid,cid};
+  document.getElementById('edit-title').textContent=`✏️ 冰箱 ${fz.name} → ${comp.name}`;
+  document.getElementById('edit-loc-info').textContent=`冰箱 ${fz.name} → ${comp.name}`;
+  const its=Object.values(items).filter(i=>i.freezerId===fid&&i.compId===cid);
+  const rows=document.getElementById('edit-rows');
+  const cname=comp.name.replace(/'/g,'\\x27');
+  if(!its.length){
+    rows.innerHTML=`<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px;">此空間目前沒有庫存<br><br>
+      <button class="btn btn-primary" onclick="closeModal('modal-edit');openAddModal('${fid}','${cid}','${cname}')">＋ 新增庫存</button></div>`;
+  } else {
+    rows.innerHTML=its.map(item=>{
+      const d=daysSince(item.date);
+      const ac=d>=180?'var(--red)':d>=90?'var(--orange)':'var(--text3)';
+      return `<div class="item-detail-row" id="row-${item.id}">
+        <div class="item-detail-left">
+          <div class="item-detail-name">${item.name}</div>
+          <div class="item-detail-meta">存入 ${item.date} <span style="color:${ac}">（${d} 天前）</span></div>
+        </div>
+        <div class="item-actions">
+          <input class="qty-unit-input" id="qty-${item.id}" value="${item.qty}">
+          <button class="qty-btn" style="color:var(--green);border-color:var(--green)" onclick="updateQty('${item.id}')">✓</button>
+          <button class="qty-btn" style="color:var(--red);border-color:var(--red)" onclick="removeItem('${item.id}')">✕</button>
+        </div></div>`;
+    }).join('')+`<div style="margin-top:8px;"><button class="btn btn-primary" style="width:100%" onclick="closeModal('modal-edit');openAddModal('${fid}','${cid}','${cname}')">＋ 再新增一項</button></div>`;
+  }
+  document.getElementById('modal-edit').classList.add('open');
+};
+
+window.updateQty = async id => {
+  const newQty=document.getElementById(`qty-${id}`)?.value.trim();
+  if(!newQty){showToast('數量不能為空');return;}
+  const item=items[id]; if(!item) return;
+  try {
+    await setDoc(doc(db,'items',id),{...item,qty:newQty});
+    await addDoc(collection(db,'history'),{time:serverTimestamp(),action:'更新',name:item.name,qty:`${item.qty} → ${newQty}`,loc:locLabel(item.freezerId,item.compId)});
+    showToast(`✅ ${item.name} 已更新為 ${newQty}`);
+    if(editTarget) openEditModal(editTarget.fid,editTarget.cid);
+  } catch(e){showToast('❌ 更新失敗');}
+};
+
+window.removeItem = async id => {
+  const item=items[id]; if(!item) return;
+  try {
+    await deleteDoc(doc(db,'items',id));
+    await addDoc(collection(db,'history'),{time:serverTimestamp(),action:'刪除',name:item.name,qty:item.qty,loc:locLabel(item.freezerId,item.compId)});
+    showToast(`🗑️ 已刪除：${item.name}`);
+    if(editTarget) openEditModal(editTarget.fid,editTarget.cid);
+  } catch(e){showToast('❌ 刪除失敗');}
+};
+
+window.closeModal = id => document.getElementById(id).classList.remove('open');
+
+// ── NAV ──
+window.switchPage = (btn, name) => {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='alerts') renderAlerts();
+  if(name==='report') renderReport();
+};
+
+// ── SEARCH ──
+window.doSearch = () => {
+  const q=document.getElementById('search-input').value.trim();
+  const el=document.getElementById('search-results');
+  if(!q){el.innerHTML='';return;}
+  const hits=Object.values(items).filter(i=>i.name.includes(q));
+  if(!hits.length){el.innerHTML=`<div class="no-result">找不到「${q}」的庫存記錄</div>`;return;}
+  el.innerHTML=hits.map(item=>`<div class="search-result-item">
+    <div><div class="result-name">${item.name}</div><div class="result-loc">${locLabel(item.freezerId,item.compId)}</div></div>
+    <div class="result-qty">${item.qty}</div></div>`).join('');
+};
+
+// ── ALERTS ──
+function renderAlerts() {
+  const all=Object.values(items);
+  const vold=all.filter(i=>daysSince(i.date)>=180).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const old=all.filter(i=>daysSince(i.date)>=90&&daysSince(i.date)<180).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const cards=(arr,id,dc)=>{ document.getElementById(id).innerHTML=arr.length
+    ?arr.map(item=>`<div class="alert-card"><div class="alert-dot ${dc}"></div>
+      <div class="alert-info"><div class="alert-name">${item.name} <span style="color:var(--text3);font-size:11px;">${item.qty}</span></div>
+      <div class="alert-meta">${locLabel(item.freezerId,item.compId)}</div></div>
+      <div class="alert-days">${daysSince(item.date)} 天</div></div>`).join('')
+    :'<div style="color:var(--text3);font-size:12px;padding:8px 4px;">目前沒有此類項目</div>'; };
+  cards(vold,'cards-very-old','red'); cards(old,'cards-old','orange');
+  document.getElementById('no-alert').style.display=(vold.length+old.length===0)?'block':'none';
+}
+
+// ── REPORT ──
+window.renderReport = async () => {
+  const all=Object.values(items).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  document.getElementById('report-tbody').innerHTML=all.map(item=>{
+    const d=daysSince(item.date);
+    const s=d>=180?`<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(248,81,73,.15);color:var(--red)">⚠️ 請儘快食用</span>`
+      :d>=90?`<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(210,153,34,.15);color:var(--orange)">注意</span>`
+      :`<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.15);color:var(--green)">正常</span>`;
+    return `<tr><td><b>${item.name}</b></td><td style="color:var(--text2);font-size:12px;">${locLabel(item.freezerId,item.compId)}</td>
+      <td>${item.qty}</td><td style="font-family:'DM Mono',monospace;font-size:12px;">${item.date}</td>
+      <td style="font-family:'DM Mono',monospace;">${d}</td><td>${s}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:32px;">目前無庫存資料</td></tr>';
+  if(!db) return;
+  try {
+    const snap=await getDocs(query(collection(db,'history'),orderBy('time','desc')));
+    const hist=[]; snap.forEach(d=>hist.push(d.data()));
+    document.getElementById('history-tbody').innerHTML=hist.slice(0,100).map(h=>{
+      const as=h.action==='新增'?'background:rgba(63,185,80,.15);color:var(--green)':h.action==='刪除'?'background:rgba(248,81,73,.15);color:var(--red)':'background:rgba(88,166,255,.15);color:var(--accent)';
+      const t=h.time?.toDate?h.time.toDate().toLocaleString('zh-TW'):'-';
+      return `<tr><td style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${t}</td>
+        <td><span style="font-size:11px;padding:2px 7px;border-radius:4px;${as}">${h.action}</span></td>
+        <td><b>${h.name}</b></td><td style="font-size:12px;color:var(--text2);">${h.loc}</td><td>${h.qty}</td></tr>`;
+    }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:20px;">無歷史紀錄</td></tr>';
+  } catch(e) {}
+};
+
+// ── EXPORT ──
+window.exportCSV = () => {
+  const all=Object.values(items);
+  const rows=[['食物名稱','冰箱','位置','數量','存入日期','冷凍天數'],
+    ...all.map(i=>[i.name,FREEZERS[i.freezerId]?.name||i.freezerId,
+      FREEZERS[i.freezerId]?.compartments.find(c=>c.id===i.compId)?.name||i.compId,
+      i.qty,i.date,daysSince(i.date)])];
+  const csv='\uFEFF'+rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`冷凍庫庫存_${today()}.csv`; a.click();
+  showToast('✅ CSV 匯出成功');
+};
+
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+</script>
+</body>
+</html>
