@@ -154,6 +154,16 @@ tr:hover td { background:var(--surface2); }
 .qty-unit-input { width:72px; font-size:12px; padding:5px 8px; background:var(--surface3); border:1px solid var(--border2); border-radius:5px; color:var(--text); font-family:inherit; outline:none; }
 .qty-btn { width:28px; height:28px; border-radius:6px; border:1px solid var(--border2); background:var(--surface3); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; transition:all .15s; flex-shrink:0; }
 
+/* Cart controls */
+.cart-controls { display:flex; align-items:center; gap:0; flex-shrink:0; border:1px solid var(--border2); border-radius:8px; overflow:hidden; }
+.cart-btn { width:36px; height:36px; border:none; background:var(--surface3); color:var(--text); cursor:pointer; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; transition:background .15s; flex-shrink:0; }
+.cart-btn.minus:hover { background:rgba(248,81,73,.2); color:var(--red); }
+.cart-btn.plus:hover { background:rgba(63,185,80,.2); color:var(--green); }
+.cart-qty-display { min-width:52px; height:36px; background:var(--surface2); display:flex; align-items:center; justify-content:center; gap:3px; border-left:1px solid var(--border2); border-right:1px solid var(--border2); }
+.cart-num { font-family:'DM Mono',monospace; font-size:15px; font-weight:700; color:var(--text); }
+.cart-unit { font-size:12px; color:var(--text3); }
+.focused-row { border:1px solid var(--accent) !important; background:rgba(88,166,255,.05) !important; }
+
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--surface3); border:1px solid var(--border2); border-radius:8px; padding:10px 20px; font-size:13px; opacity:0; transition:all .25s; z-index:999; white-space:nowrap; pointer-events:none; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
@@ -433,7 +443,7 @@ function renderOverview() {
       if(!its.length) { html+=`<span class="empty-hint">（空）</span>`; }
       else its.forEach(item => {
         const d=daysSince(item.date); const cls=d>=180?'very-old':d>=90?'old':'';
-        html+=`<span class="item-chip ${cls}" onclick="event.stopPropagation();openEditModal('${fid}','${comp.id}')">${item.name} <span class="item-qty">${item.qty}</span></span>`;
+        html+=`<span class="item-chip ${cls}" onclick="event.stopPropagation();openEditModal('${fid}','${comp.id}','${item.id}')">${item.name} <span class="item-qty">${item.qty}</span></span>`;
       });
       html+=`</div></div>`;
     });
@@ -479,39 +489,125 @@ window.confirmAdd = async () => {
   } catch(e){showToast('❌ 新增失敗：'+e.message);}
 };
 
+// ── PARSE QTY ──
+// 把 "2片" 拆成 { num: 2, unit: "片" }，解析失敗回傳 null
+function parseQty(qty) {
+  const m = qty.trim().match(/^(\d+(\.\d+)?)\s*(.*)$/);
+  if (!m) return null;
+  return { num: parseFloat(m[1]), unit: m[3].trim() };
+}
+function formatQty(num, unit) {
+  return unit ? `${num}${unit}` : `${num}`;
+}
+
 // ── EDIT ──
-window.openEditModal = (fid, cid) => {
+window.openEditModal = (fid, cid, focusItemId=null) => {
   const fz=FREEZERS[fid]; const comp=fz.compartments.find(c=>c.id===cid);
   editTarget={fid,cid};
   document.getElementById('edit-title').textContent=`✏️ 冰箱 ${fz.name} → ${comp.name}`;
   document.getElementById('edit-loc-info').textContent=`冰箱 ${fz.name} → ${comp.name}`;
-  const its=Object.values(items).filter(i=>i.freezerId===fid&&i.compId===cid);
+
+  // 排序：被點的品項排第一
+  let its = Object.values(items).filter(i=>i.freezerId===fid&&i.compId===cid);
+  if (focusItemId) {
+    its = [...its.filter(i=>i.id===focusItemId), ...its.filter(i=>i.id!==focusItemId)];
+  }
+
   const rows=document.getElementById('edit-rows');
   const cname=comp.name.replace(/'/g,'\\x27');
+
   if(!its.length){
     rows.innerHTML=`<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px;">此空間目前沒有庫存<br><br>
       <button class="btn btn-primary" onclick="closeModal('modal-edit');openAddModal('${fid}','${cid}','${cname}')">＋ 新增庫存</button></div>`;
   } else {
-    rows.innerHTML=its.map(item=>{
-      const d=daysSince(item.date);
-      const ac=d>=180?'var(--red)':d>=90?'var(--orange)':'var(--text3)';
-      return `<div class="item-detail-row" id="row-${item.id}">
-        <div class="item-detail-left">
-          <div class="item-detail-name">${item.name}</div>
-          <div class="item-detail-meta">存入 ${item.date} <span style="color:${ac}">（${d} 天前）</span></div>
-        </div>
-        <div class="item-actions">
-          <input class="qty-unit-input" id="qty-${item.id}" value="${item.qty}">
-          <button class="qty-btn" style="color:var(--green);border-color:var(--green)" onclick="updateQty('${item.id}')">✓</button>
-          <button class="qty-btn" style="color:var(--red);border-color:var(--red)" onclick="removeItem('${item.id}')">✕</button>
-        </div></div>`;
-    }).join('')+`<div style="margin-top:8px;"><button class="btn btn-primary" style="width:100%" onclick="closeModal('modal-edit');openAddModal('${fid}','${cid}','${cname}')">＋ 再新增一項</button></div>`;
+    rows.innerHTML = its.map(item => {
+      const d = daysSince(item.date);
+      const ac = d>=180?'var(--red)':d>=90?'var(--orange)':'var(--text3)';
+      const parsed = parseQty(item.qty);
+      const isFocused = item.id === focusItemId;
+
+      if (parsed) {
+        // 購物車模式
+        return `<div class="item-detail-row${isFocused?' focused-row':''}" id="row-${item.id}">
+          <div class="item-detail-left">
+            <div class="item-detail-name">${item.name}</div>
+            <div class="item-detail-meta">存入 ${item.date} <span style="color:${ac}">（${d} 天前）</span></div>
+          </div>
+          <div class="cart-controls">
+            <button class="cart-btn minus" onclick="cartMinus('${item.id}')">－</button>
+            <div class="cart-qty-display">
+              <span class="cart-num" id="cartnum-${item.id}">${parsed.num}</span>
+              <span class="cart-unit">${parsed.unit}</span>
+            </div>
+            <button class="cart-btn plus" onclick="cartPlus('${item.id}')">＋</button>
+          </div>
+        </div>`;
+      } else {
+        // 降級：無法解析數字，保留手動輸入
+        return `<div class="item-detail-row${isFocused?' focused-row':''}" id="row-${item.id}">
+          <div class="item-detail-left">
+            <div class="item-detail-name">${item.name}</div>
+            <div class="item-detail-meta">存入 ${item.date} <span style="color:${ac}">（${d} 天前）</span></div>
+          </div>
+          <div class="item-actions">
+            <input class="qty-unit-input" id="qty-${item.id}" value="${item.qty}">
+            <button class="qty-btn" style="color:var(--green);border-color:var(--green)" onclick="updateQtyManual('${item.id}')">✓</button>
+            <button class="qty-btn" style="color:var(--red);border-color:var(--red)" onclick="removeItem('${item.id}')">✕</button>
+          </div>
+        </div>`;
+      }
+    }).join('') + `<div style="margin-top:8px;"><button class="btn btn-primary" style="width:100%" onclick="closeModal('modal-edit');openAddModal('${fid}','${cid}','${cname}')">＋ 再新增一項</button></div>`;
   }
+
   document.getElementById('modal-edit').classList.add('open');
+
+  // 若有 focus 項目，稍等 DOM 更新後捲到頂（已排第一，確保看得到）
+  if (focusItemId) {
+    setTimeout(() => {
+      const modalBody = document.querySelector('#modal-edit .modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
+    }, 50);
+  }
 };
 
-window.updateQty = async id => {
-  const newQty=document.getElementById(`qty-${id}`)?.value.trim();
+// 購物車：減
+window.cartMinus = async id => {
+  const item = items[id]; if(!item) return;
+  const parsed = parseQty(item.qty); if(!parsed) return;
+  const newNum = parsed.num - 1;
+  if (newNum <= 0) {
+    await removeItem(id);
+    return;
+  }
+  const newQty = formatQty(newNum, parsed.unit);
+  try {
+    await setDoc(doc(db,'items',id), {...item, qty: newQty});
+    await addDoc(collection(db,'history'), {time:serverTimestamp(),action:'更新',name:item.name,qty:`${item.qty} → ${newQty}`,loc:locLabel(item.freezerId,item.compId)});
+    // 直接更新畫面數字，不重新渲染整個 modal
+    const numEl = document.getElementById(`cartnum-${id}`);
+    if (numEl) numEl.textContent = newNum;
+    showToast(`${item.name}：${item.qty} → ${newQty}`);
+  } catch(e) { showToast('❌ 更新失敗'); }
+};
+
+// 購物車：加
+window.cartPlus = async id => {
+  const item = items[id]; if(!item) return;
+  const parsed = parseQty(item.qty); if(!parsed) return;
+  const newNum = parsed.num + 1;
+  const newQty = formatQty(newNum, parsed.unit);
+  try {
+    await setDoc(doc(db,'items',id), {...item, qty: newQty});
+    await addDoc(collection(db,'history'), {time:serverTimestamp(),action:'更新',name:item.name,qty:`${item.qty} → ${newQty}`,loc:locLabel(item.freezerId,item.compId)});
+    const numEl = document.getElementById(`cartnum-${id}`);
+    if (numEl) numEl.textContent = newNum;
+    showToast(`${item.name}：${item.qty} → ${newQty}`);
+  } catch(e) { showToast('❌ 更新失敗'); }
+};
+
+// 手動輸入模式（降級用）
+window.updateQtyManual = async id => {
+  const newQty = document.getElementById(`qty-${id}`)?.value.trim();
   if(!newQty){showToast('數量不能為空');return;}
   const item=items[id]; if(!item) return;
   try {
@@ -528,7 +624,12 @@ window.removeItem = async id => {
     await deleteDoc(doc(db,'items',id));
     await addDoc(collection(db,'history'),{time:serverTimestamp(),action:'刪除',name:item.name,qty:item.qty,loc:locLabel(item.freezerId,item.compId)});
     showToast(`🗑️ 已刪除：${item.name}`);
-    if(editTarget) openEditModal(editTarget.fid,editTarget.cid);
+    // 從 modal 中直接移除該列，不重新渲染
+    const row = document.getElementById(`row-${id}`);
+    if (row) row.remove();
+    // 如果全部刪完就重渲染
+    const remaining = document.querySelectorAll('#edit-rows .item-detail-row');
+    if (remaining.length === 0 && editTarget) openEditModal(editTarget.fid, editTarget.cid);
   } catch(e){showToast('❌ 刪除失敗');}
 };
 
